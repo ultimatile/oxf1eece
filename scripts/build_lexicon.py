@@ -57,7 +57,8 @@ WORD = re.compile(r"[a-z]+")
 OEWN_POS = {"n": Pos.NOUN, "v": Pos.VERB, "a": Pos.ADJ, "s": Pos.ADJ, "r": Pos.ADV}
 # ESDB POS tag -> POS of the inflected forms listed on that line. `m` (noun/verb) lists
 # -ed / -ing verb forms and an -s form that may also be a noun plural; all are recorded
-# as verb forms only, so that no -ed / -ing form is ever tagged as a noun. `a`
+# as verb forms only, so that no -ed / -ing form taken from ESDB is tagged as a noun
+# (OEWN may still list such a word as a noun lemma of its own, e.g. `backlighting`). `a`
 # (adjective/adverb) lists comparatives and superlatives, which serve both. Lines with any
 # other tag (including the combined `n_v` / `aj_av`, which the pinned data does not use)
 # contribute sizes but no inflected forms.
@@ -163,6 +164,19 @@ def _clean_word(token: str) -> str | None:
     return word if WORD.fullmatch(word) else None
 
 
+def _split_field(text: str) -> tuple[str, str]:
+    """Split at the first `: ` outside `{...}`, since a sense note may contain `: ` itself."""
+    depth = 0
+    for i, ch in enumerate(text):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif depth == 0 and text.startswith(": ", i):
+            return text[:i], text[i + 2 :]
+    return text, ""
+
+
 def _is_invalid(variant_info: str) -> bool:
     """Whether a variant-info prefix marks a spelling with level `x` (ESDB: invalid)."""
     return any(t.endswith("x") for t in variant_info.split())
@@ -213,11 +227,11 @@ def parse_esdb(lines: Iterable[str]) -> Iterator[EsdbLine]:
         sizes = [int(s) for s in re.findall(r"\d+", re.sub(r"\[[^\]]*\]", "", info))]
         if not sizes:
             continue
-        head, _, derived = rest.partition(": ")
+        head, derived = _split_field(rest)
         invalid = False
         while VARIANT_INFO.fullmatch(head):
             invalid = invalid or _is_invalid(head)
-            head, _, derived = derived.partition(": ")
+            head, derived = _split_field(derived)
         if invalid:
             continue
         m = LEMMA_INFO.fullmatch(head)

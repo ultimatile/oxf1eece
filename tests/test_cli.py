@@ -98,16 +98,17 @@ def test_bad_arguments_are_rejected_by_the_parser(argv: list[str]) -> None:
     assert exc.value.code == 2
 
 
+def cli_command(*argv: str) -> list[str]:
+    """A command line that runs `hexsieve <argv>` in a fresh interpreter."""
+    code = f"import sys; from hexsieve.cli import main; sys.exit(main({list(argv)!r}))"
+    return [sys.executable, "-c", code]
+
+
+ASCII_LOCALE = {"PYTHONIOENCODING": "ascii", "PYTHONUTF8": "0", "LC_ALL": "C"}
+
+
 def test_closed_pipe_exits_quietly() -> None:
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            "-c",
-            "import sys; from hexsieve.cli import main; sys.exit(main(['list']))",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    proc = subprocess.Popen(cli_command("list"), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     assert proc.stdout is not None and proc.stderr is not None
     proc.stdout.readline()
     proc.stdout.close()
@@ -191,14 +192,7 @@ def test_broken_lexicon_is_reported_as_an_error(
 
 def test_output_is_utf8_even_under_an_ascii_locale() -> None:
     proc = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "import sys; from hexsieve.cli import main; sys.exit(main(['list']))",
-        ],
-        capture_output=True,
-        env={**os.environ, "PYTHONIOENCODING": "ascii", "PYTHONUTF8": "0"},
-        check=False,
+        cli_command("list"), capture_output=True, env={**os.environ, **ASCII_LOCALE}, check=False
     )
     assert proc.returncode == 0, proc.stderr
     text = proc.stdout.decode("utf-8")
@@ -207,17 +201,10 @@ def test_output_is_utf8_even_under_an_ascii_locale() -> None:
 
 @needs_fzf
 def test_search_rows_reach_fzf_as_utf8_under_an_ascii_locale() -> None:
-    code = "import sys; from hexsieve.cli import main; sys.exit(main(['search', '--pos', 'adj']))"
     proc = subprocess.run(
-        [sys.executable, "-c", code],
+        cli_command("search", "--pos", "adj"),
         capture_output=True,
-        env={
-            **os.environ,
-            "PYTHONIOENCODING": "ascii",
-            "PYTHONUTF8": "0",
-            "LC_ALL": "C",
-            "FZF_DEFAULT_OPTS": "--filter=ab1e",
-        },
+        env={**os.environ, **ASCII_LOCALE, "FZF_DEFAULT_OPTS": "--filter=ab1e"},
         check=False,
     )
     assert proc.returncode == 0, proc.stderr

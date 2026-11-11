@@ -50,6 +50,8 @@ not a data line
 60 [12dicts]: Bob <v>: bobbed, bobbing
 60 [12dicts]: - <v>: bobs
 
+70 [3of6]: A B: -draught <n> {british: game of checkers}: draughts
+
 35 [12dicts]: big <aj>
 ## a comment line inside a group
 35 [12dicts]: - <aj>: bigger, biggest
@@ -260,11 +262,8 @@ def test_lexicon_reader_rejects_malformed_rows(text: str, message: str) -> None:
         list(parse_rows(io.StringIO(text)))
 
 
-def test_fetch_rejects_a_cached_file_with_the_wrong_digest(tmp_path: Path) -> None:
-    (tmp_path / "data.txt").write_text("tampered")
-    src = Source("https://example.invalid/data.txt", "0" * 64, "data.txt")
-    with pytest.raises(SystemExit, match="does not match pinned"):
-        fetch(src, tmp_path)
+def test_esdb_sense_note_may_contain_the_field_separator() -> None:
+    assert EsdbLine(70, "draught", "n", ("draughts",)) in esdb_lines()
 
 
 def test_esdb_comment_line_does_not_end_a_group() -> None:
@@ -275,52 +274,50 @@ def test_esdb_unparsable_lemma_owns_its_continuation_lines() -> None:
     assert "bigtops" not in esdb_words()
 
 
-class FakeResponse(io.BytesIO):
-    pass
+def source(content: bytes = b"good") -> Source:
+    """A Source pinned to the digest of `content`."""
+    return Source(
+        "https://example.invalid/data.txt", hashlib.sha256(content).hexdigest(), "data.txt"
+    )
 
 
-def test_fetch_does_not_cache_a_download_with_the_wrong_digest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    def urlopen(_url: str) -> FakeResponse:
-        return FakeResponse(b"tampered")
+def serve(monkeypatch: pytest.MonkeyPatch, body: bytes | Exception) -> None:
+    """Make every download return `body`, or raise it if it is an exception."""
+
+    def urlopen(_url: str) -> io.BytesIO:
+        if isinstance(body, Exception):
+            raise body
+        return io.BytesIO(body)
 
     monkeypatch.setattr(build_lexicon.urllib.request, "urlopen", urlopen)
-    src = Source("https://example.invalid/data.txt", "0" * 64, "data.txt")
+
+
+def test_fetch_returns_a_cached_file_with_the_pinned_digest(tmp_path: Path) -> None:
+    (tmp_path / "data.txt").write_bytes(b"good")
+    assert fetch(source(), tmp_path) == tmp_path / "data.txt"
+
+
+def test_fetch_rejects_a_cached_file_with_the_wrong_digest(tmp_path: Path) -> None:
+    (tmp_path / "data.txt").write_bytes(b"tampered")
     with pytest.raises(SystemExit, match="does not match pinned"):
-        fetch(src, tmp_path)
-    assert list(tmp_path.iterdir()) == []
+        fetch(source(), tmp_path)
 
 
 def test_fetch_caches_a_download_with_the_pinned_digest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def urlopen(_url: str) -> FakeResponse:
-        return FakeResponse(b"good")
-
-    monkeypatch.setattr(build_lexicon.urllib.request, "urlopen", urlopen)
-    src = Source(
-        "https://example.invalid/data.txt", hashlib.sha256(b"good").hexdigest(), "data.txt"
-    )
-    assert fetch(src, tmp_path).read_bytes() == b"good"
+    serve(monkeypatch, b"good")
+    assert fetch(source(), tmp_path).read_bytes() == b"good"
     assert [p.name for p in tmp_path.iterdir()] == ["data.txt"]
 
 
-def test_fetch_returns_a_cached_file_with_the_pinned_digest(tmp_path: Path) -> None:
-    (tmp_path / "data.txt").write_bytes(b"good")
-    src = Source(
-        "https://example.invalid/data.txt", hashlib.sha256(b"good").hexdigest(), "data.txt"
-    )
-    assert fetch(src, tmp_path) == tmp_path / "data.txt"
-
-
-def test_fetch_leaves_nothing_when_the_transfer_fails(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("body", "error"), [(b"tampered", SystemExit), (OSError("connection reset"), OSError)]
+)
+def test_fetch_leaves_nothing_after_a_bad_download(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: bytes | Exception, error: type
 ) -> None:
-    def urlopen(_url: str) -> FakeResponse:
-        raise OSError("connection reset")
-
-    monkeypatch.setattr(build_lexicon.urllib.request, "urlopen", urlopen)
-    with pytest.raises(OSError, match="connection reset"):
-        fetch(Source("https://example.invalid/d", "0" * 64, "d"), tmp_path)
+    serve(monkeypatch, body)
+    with pytest.raises(error):
+        fetch(source(), tmp_path)
     assert list(tmp_path.iterdir()) == []
