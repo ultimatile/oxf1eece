@@ -1,0 +1,20 @@
+# Conversion rules: a run of letters (`from`) is rewritten to hex digits (`to`).
+# The letters a-f always map to themselves and need no rule.
+
+[rules]
+o0 = { from = "o", to = "0" }
+i1 = { from = "i", to = "1" }
+l1 = { from = "l", to = "1" }
+s5 = { from = "s", to = "5" }
+t7 = { from = "t", to = "7" }
+g6 = { from = "g", to = "6" }
+g9 = { from = "g", to = "9" }
+z2 = { from = "z", to = "2" }
+ate8 = { from = "ate", to = "8" } # l8 = late
+for4 = { from = "for", to = "4" }
+to2 = { from = "to", to = "2" }
+
+[presets]
+strict = []
+classic = ["o0", "i1", "l1", "s5"]
+leet = ["o0", "i1", "l1", "s5", "t7", "g9", "z2"]
