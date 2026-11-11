@@ -1,5 +1,6 @@
 # Conversion rules: a run of letters (`from`) is rewritten to hex digits (`to`).
-# The letters a-f always map to themselves and need no rule.
+# The letters a-f need no rule: they can always stay as themselves (a multi-letter rule
+# may still consume them, e.g. for4 turns "before" into "be4e").
 
 [rules]
 o0 = { from = "o", to = "0" }
@@ -10,7 +11,7 @@ t7 = { from = "t", to = "7" }
 g6 = { from = "g", to = "6" }
 g9 = { from = "g", to = "9" }
 z2 = { from = "z", to = "2" }
-ate8 = { from = "ate", to = "8" } # l8 = late
+ate8 = { from = "ate", to = "8" } # with l1: late -> 18
 for4 = { from = "for", to = "4" }
 to2 = { from = "to", to = "2" }
 

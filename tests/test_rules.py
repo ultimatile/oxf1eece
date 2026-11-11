@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-from hexsieve.rules import Derivation, Rule, RuleError, RuleSet, load_catalog, parse_catalog
+from hexsieve.rules import (
+    Derivation,
+    Rule,
+    RuleCatalog,
+    RuleError,
+    RuleSet,
+    load_catalog,
+    parse_catalog,
+)
 
 
 def rs(*specs: tuple[str, str, str]) -> RuleSet:
@@ -43,8 +51,20 @@ def test_multi_letter_rule_competes_with_letter_rules() -> None:
     assert hexes(rules, "late") == {"18", "1a7e"}
 
 
+def test_equally_small_rule_sets_are_broken_by_rule_name() -> None:
+    assert rs(("q", "y", "1"), ("p", "y", "1")).convert("y") == {Derivation("1", ("p",))}
+
+
 def test_same_hex_via_two_paths_keeps_the_one_with_fewer_rules() -> None:
     assert rs(("ab", "ab", "ab")).convert("ab") == {Derivation("ab", ())}
+
+
+def test_fewest_rules_is_global_not_chosen_per_suffix() -> None:
+    # "yyb" -> "11b" either as y,y,b via q alone, or as y + yb via {q, p}. For the suffix
+    # "yb" alone, p ({p}) and q ({q}) tie, so a per-suffix choice can keep p and end
+    # with {p, q}; the minimum over the whole word is {q}.
+    rules = rs(("p", "yb", "1b"), ("q", "y", "1"))
+    assert rules.convert("yyb") == {Derivation("11b", ("q",))}
 
 
 @pytest.mark.parametrize(
@@ -78,21 +98,30 @@ def test_disable_wins_over_enable() -> None:
 
 
 @pytest.mark.parametrize(
-    "kwargs", [{"preset": "nope"}, {"enable": ["nope"]}, {"disable": ["nope"]}]
+    ("preset", "enable", "disable"),
+    [("nope", [], []), ("classic", ["nope"], []), ("classic", [], ["nope"])],
 )
-def test_resolve_rejects_unknown_names(kwargs: dict[str, object]) -> None:
+def test_resolve_rejects_unknown_names(preset: str, enable: list[str], disable: list[str]) -> None:
     with pytest.raises(RuleError):
-        parse_catalog(CATALOG).resolve(**kwargs)  # type: ignore[arg-type]
+        parse_catalog(CATALOG).resolve(preset, enable, disable)
 
 
-def test_preset_naming_unknown_rule_is_rejected() -> None:
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ('[rules]\n[presets]\nclassic = ["x9"]\n', "unknown rules"),
+        ("[rules\n", "invalid rules TOML"),
+        ("[rules]\n[presets]\nstrict = []\n", "default preset"),
+    ],
+)
+def test_catalog_checks_raise_rule_error(text: str, message: str) -> None:
+    with pytest.raises(RuleError, match=message):
+        parse_catalog(text)
+
+
+def test_catalog_built_directly_is_validated_too() -> None:
     with pytest.raises(RuleError, match="unknown rules"):
-        parse_catalog('[rules]\n[presets]\nclassic = ["x9"]\n')
-
-
-def test_catalog_without_default_preset_is_rejected() -> None:
-    with pytest.raises(RuleError, match="default preset"):
-        parse_catalog("[rules]\n[presets]\nstrict = []\n")
+        RuleCatalog({}, {"classic": ("x9",)})
 
 
 def test_bundled_presets_match_the_design() -> None:

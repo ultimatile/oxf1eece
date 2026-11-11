@@ -14,7 +14,12 @@ DEFAULT_PRESET = "classic"
 
 
 class RuleError(ValueError):
-    """A rule definition or rule selection is invalid."""
+    """A check in this module failed: TOML syntax, a rule's `from` / `to` text, a preset
+    naming an unknown rule, a missing default preset, or an unknown preset or rule name.
+
+    Only these are checked. A structurally malformed rules file (a missing key, a value of
+    the wrong type) is not, and surfaces as Python's own exception.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,18 +60,21 @@ class RuleSet:
 
         The word is consumed left to right; at each position the letters a-f may stay as
         themselves and every enabled rule whose `source` matches there may fire. When
-        several rule combinations yield the same hex string, the one using the fewest
-        rules is kept.
+        several rule combinations yield the same hex string, one using the fewest distinct
+        rules is kept (ties broken by rule names).
         """
         word = word.lower()
         if not set(word) <= self._letters():
             return frozenset()
 
+        # For each suffix and each hex spelling of it, keep every inclusion-minimal set of
+        # rule names that produces it. Dropping a superset T of an achievable S is safe:
+        # whatever rule a prefix adds, S | {n} is a subset of T | {n}, so T never wins.
         @cache
-        def from_pos(i: int) -> dict[str, frozenset[str]]:
+        def from_pos(i: int) -> dict[str, frozenset[frozenset[str]]]:
             if i == len(word):
-                return {"": frozenset()}
-            out: dict[str, frozenset[str]] = {}
+                return {"": frozenset({frozenset()})}
+            out: dict[str, set[frozenset[str]]] = {}
             options: list[tuple[str, int, str | None]] = []
             if word[i] in HEX_LETTERS:
                 options.append((word[i], 1, None))
@@ -76,15 +84,14 @@ class RuleSet:
                 if word.startswith(r.source, i)
             )
             for target, step, name in options:
-                for tail, used in from_pos(i + step).items():
-                    names = used | {name} if name is not None else used
-                    hex_ = target + tail
-                    if hex_ not in out or _rank(names) < _rank(out[hex_]):
-                        out[hex_] = names
-            return out
+                for tail, name_sets in from_pos(i + step).items():
+                    bucket = out.setdefault(target + tail, set())
+                    bucket.update(s | {name} if name is not None else s for s in name_sets)
+            return {hex_: _minimal(sets) for hex_, sets in out.items()}
 
         return frozenset(
-            Derivation(hex_, tuple(sorted(names))) for hex_, names in from_pos(0).items()
+            Derivation(hex_, tuple(sorted(min(sets, key=_rank))))
+            for hex_, sets in from_pos(0).items()
         )
 
     def _letters(self) -> frozenset[str]:
@@ -94,6 +101,10 @@ class RuleSet:
 @cache
 def _letters_of(rules: tuple[Rule, ...]) -> frozenset[str]:
     return frozenset(HEX_LETTERS).union(*(r.source for r in rules))
+
+
+def _minimal(sets: set[frozenset[str]]) -> frozenset[frozenset[str]]:
+    return frozenset(s for s in sets if not any(t < s for t in sets))
 
 
 def _rank(names: frozenset[str]) -> tuple[int, tuple[str, ...]]:
@@ -106,6 +117,14 @@ class RuleCatalog:
 
     rules: Mapping[str, Rule]
     presets: Mapping[str, tuple[str, ...]]
+
+    def __post_init__(self) -> None:
+        for name, members in self.presets.items():
+            unknown = [m for m in members if m not in self.rules]
+            if unknown:
+                raise RuleError(f"preset {name!r} names unknown rules: {', '.join(unknown)}")
+        if DEFAULT_PRESET not in self.presets:
+            raise RuleError(f"the default preset {DEFAULT_PRESET!r} is not defined")
 
     def resolve(
         self,
@@ -132,15 +151,7 @@ def parse_catalog(text: str) -> RuleCatalog:
     raw_rules: dict[str, dict[str, str]] = doc.get("rules", {})
     rules = {name: Rule(name, spec["from"], spec["to"]) for name, spec in raw_rules.items()}
     raw_presets: dict[str, list[str]] = doc.get("presets", {})
-    presets: dict[str, tuple[str, ...]] = {}
-    for name, members in raw_presets.items():
-        unknown = [m for m in members if m not in rules]
-        if unknown:
-            raise RuleError(f"preset {name!r} names unknown rules: {', '.join(unknown)}")
-        presets[name] = tuple(members)
-    if DEFAULT_PRESET not in presets:
-        raise RuleError(f"rules file must define the default preset {DEFAULT_PRESET!r}")
-    return RuleCatalog(rules, presets)
+    return RuleCatalog(rules, {name: tuple(members) for name, members in raw_presets.items()})
 
 
 @cache

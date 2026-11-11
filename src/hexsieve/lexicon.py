@@ -37,7 +37,9 @@ class Entry:
 
 
 class LexiconError(ValueError):
-    """The lexicon file is malformed."""
+    """A lexicon row is malformed (header, field count, POS or size), or an entry cannot be
+    written as a row. A corrupt gzip stream or non-UTF-8 data is not checked and surfaces as
+    Python's own exception."""
 
 
 def parse_rows(lines: Iterable[str]) -> Iterator[Entry]:
@@ -57,14 +59,22 @@ def parse_rows(lines: Iterable[str]) -> Iterator[Entry]:
 
 
 def format_rows(entries: Iterable[Entry]) -> Iterator[str]:
+    """Serialize entries as TSV; raises LexiconError for a field holding a tab or newline."""
     yield "\t".join(COLUMNS) + "\n"
     for e in entries:
         size = "" if e.size is None else str(e.size)
-        yield "\t".join((e.word, e.pos.value, size, e.lemma, e.gloss)) + "\n"
+        fields = (e.word, e.pos.value, size, e.lemma, e.gloss)
+        if any("\t" in f or "\n" in f for f in fields):
+            raise LexiconError(f"entry {e.word!r} has a tab or newline in a field")
+        yield "\t".join(fields) + "\n"
+
+
+def read_lexicon(raw: bytes) -> tuple[Entry, ...]:
+    """Parse gzip-compressed lexicon rows; only "\\n" ends a row, as `format_rows` writes."""
+    with gzip.open(io.BytesIO(raw), "rt", encoding="utf-8", newline="\n") as f:
+        return tuple(parse_rows(f))
 
 
 @cache
 def load_lexicon() -> tuple[Entry, ...]:
-    raw = files("hexsieve").joinpath("data", "lexicon.tsv.gz").read_bytes()
-    with gzip.open(io.BytesIO(raw), "rt", encoding="utf-8") as f:
-        return tuple(parse_rows(f))
+    return read_lexicon(files("hexsieve").joinpath("data", "lexicon.tsv.gz").read_bytes())

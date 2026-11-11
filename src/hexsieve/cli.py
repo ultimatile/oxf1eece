@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 
 from hexsieve.lexicon import LexiconError, Pos, load_lexicon
 from hexsieve.rules import DEFAULT_PRESET, RuleError, RuleSet, load_catalog
@@ -19,37 +20,54 @@ def _csv(value: str) -> list[str]:
     return [v for v in (s.strip() for s in value.split(",")) if v]
 
 
-def _digits(value: str) -> int:
-    n = int(value)
-    if n < 2:
-        raise argparse.ArgumentTypeError(f"need at least 2 digits (one per word), got {n}")
-    return n
+def _pos_list(value: str) -> list[Pos]:
+    names = _csv(value)
+    unknown = [n for n in names if n not in POS_CHOICES]
+    if unknown:
+        raise argparse.ArgumentTypeError(
+            f"unknown part of speech: {', '.join(unknown)} (known: {', '.join(POS_CHOICES)})"
+        )
+    return [POS_CHOICES[n] for n in names]
+
+
+def _at_least(minimum: int, what: str) -> Callable[[str], int]:
+    def parse(value: str) -> int:
+        try:
+            n = int(value)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"{what} must be an integer, got {value!r}") from None
+        if n < minimum:
+            raise argparse.ArgumentTypeError(f"{what} must be at least {minimum}, got {n}")
+        return n
+
+    return parse
+
+
+def _add_list_option(
+    add_argument: Callable[..., object],
+    flag: str,
+    metavar: str,
+    help_: str,
+    parse: Callable[[str], Sequence[object]] = _csv,
+) -> None:
+    """Add a repeatable comma-separated option; values accumulate across uses."""
+    add_argument(flag, type=parse, action="extend", default=[], metavar=metavar, help=help_)
 
 
 def _common_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(add_help=False)
     g = p.add_argument_group("conversion rules")
     g.add_argument("--preset", default=DEFAULT_PRESET, help="rule preset (default: %(default)s)")
-    g.add_argument(
-        "--enable",
-        type=_csv,
-        action="extend",
-        default=[],
-        metavar="RULES",
-        help="comma-separated rules to add to the preset",
+    _add_list_option(
+        g.add_argument, "--enable", "RULES", "comma-separated rules to add to the preset"
     )
-    g.add_argument(
-        "--disable",
-        type=_csv,
-        action="extend",
-        default=[],
-        metavar="RULES",
-        help="comma-separated rules to remove from the preset",
+    _add_list_option(
+        g.add_argument, "--disable", "RULES", "comma-separated rules to remove from the preset"
     )
     f = p.add_argument_group("filtering and output")
     f.add_argument(
         "--max-size",
-        type=int,
+        type=_at_least(1, "--max-size"),
         metavar="N",
         help="keep only words whose ESDB size is N or less (35 common ... 80 rare)",
     )
@@ -62,7 +80,9 @@ def _common_parser() -> argparse.ArgumentParser:
         "alpha, random (default: %(default)s)",
     )
     f.add_argument("--seed", type=int, help="seed for --sort random")
-    f.add_argument("--limit", type=int, metavar="N", help="print at most N rows")
+    f.add_argument(
+        "--limit", type=_at_least(1, "--limit"), metavar="N", help="print at most N rows"
+    )
     f.add_argument("--upper", action="store_true", help="print hex in uppercase")
     return p
 
@@ -77,24 +97,31 @@ def build_parser() -> argparse.ArgumentParser:
         ("search", "pick words interactively with fzf"),
     ):
         sp = sub.add_parser(name, parents=[common], help=help_, description=help_)
-        sp.add_argument(
+        _add_list_option(
+            sp.add_argument,
             "--pos",
-            type=_csv,
-            action="extend",
-            default=[],
-            metavar="POS",
-            help=f"comma-separated parts of speech to keep ({', '.join(POS_CHOICES)})",
+            "POS",
+            f"comma-separated parts of speech to keep ({', '.join(POS_CHOICES)})",
+            _pos_list,
         )
-        sp.add_argument("--length", type=int, metavar="N", help="keep only N-digit hex spellings")
+        sp.add_argument(
+            "--length",
+            type=_at_least(1, "--length"),
+            metavar="N",
+            help="keep only N-digit hex spellings",
+        )
 
     tp = sub.add_parser(
         "tag",
         parents=[common],
         help="print adjective+noun tags as TSV: hex, adj+noun, size, rules",
         description="Print adjective+noun tags whose joined hex has exactly DIGITS digits. "
-        "A tag's size is the larger (rarer) of its two words' sizes.",
+        "A tag's size is the larger (rarer) of its two words' sizes, or empty if either "
+        "word has none.",
     )
-    tp.add_argument("digits", type=_digits, help="total number of hex digits, e.g. 8")
+    tp.add_argument(
+        "digits", type=_at_least(2, "DIGITS"), help="total number of hex digits, e.g. 8"
+    )
 
     sub.add_parser("rules", help="show the available rules and presets")
     return parser
@@ -152,12 +179,7 @@ def _tag_rows(tags: Sequence[Tag], upper: bool) -> Iterator[str]:
 
 
 def _select_hits(args: argparse.Namespace) -> list[Hit]:
-    unknown = [p for p in args.pos if p not in POS_CHOICES]
-    if unknown:
-        raise RuleError(
-            f"unknown part of speech: {', '.join(unknown)} (known: {', '.join(POS_CHOICES)})"
-        )
-    pos = frozenset(POS_CHOICES[p] for p in args.pos) or None
+    pos = frozenset[Pos](args.pos) or None
     hits = sieve(load_lexicon(), _ruleset(args), pos=pos, max_size=args.max_size)
     if args.length is not None:
         hits = [h for h in hits if len(h.hex) == args.length]
@@ -166,7 +188,7 @@ def _select_hits(args: argparse.Namespace) -> list[Hit]:
 
 def _print_rules() -> None:
     catalog = load_catalog()
-    print("rules (a-f always map to themselves):")
+    print("rules (the letters a-f need none):")
     for r in catalog.rules.values():
         print(f"  {r.name:<6} {r.source} -> {r.target}")
     print("presets:")
@@ -197,11 +219,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 sys.stdout.writelines(_tag_rows(tags[: args.limit], args.upper))
             case _:
                 raise AssertionError(f"unhandled command {args.command!r}")
+        # Flush here so a closed pipe surfaces inside this try, not at interpreter exit.
+        sys.stdout.flush()
     except (RuleError, LexiconError, FzfNotFoundError) as e:
         print(f"hexsieve: error: {e}", file=sys.stderr)
         return 2
     except BrokenPipeError:
-        # Downstream (e.g. `| head`) closed the pipe; that is not an error for a filter.
-        sys.stderr.close()
-        return 0
+        # Downstream (e.g. `| head`) closed the pipe. Point stdout at devnull so the
+        # interpreter's final flush does not raise again (Python docs, "Note on SIGPIPE").
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        return 1
     return 0

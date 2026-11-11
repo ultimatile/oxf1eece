@@ -38,8 +38,8 @@ The columns are the hex spelling, the words, their size (see below) and the rule
 
 ### Conversion rules
 
-The letters a–f always stand for themselves. Other letters are converted by named rules,
-grouped into presets:
+The letters a–f need no rule. Other letters are converted by named rules, grouped into
+presets:
 
 | Preset | Rules |
 | --- | --- |
@@ -53,12 +53,13 @@ Choose a preset with `--preset` and adjust it with comma-separated `--enable` / 
 hexsieve list --preset classic --enable t7 --disable l1
 ```
 
-`hexsieve rules` shows every rule, including multi-letter ones such as `ate8` (late → l8).
+`hexsieve rules` shows every rule, including multi-letter ones such as `ate8` (with `l1`, `late` → `18`).
 
 ### Filtering and sorting
 
-Each word has a *size* from the English Speller Database: 35 for common words, then 50,
-60, 70, up to 80 for rare but valid ones. A tag's size is that of its rarer word.
+Most words have a *size* from the English Speller Database, from 35 for common words up
+to 80 for rare but valid ones; the rest show an empty size and come last when sorting by
+size. A tag's size is that of its rarer word, and is empty if either word has none.
 
 | Option | Effect |
 | --- | --- |

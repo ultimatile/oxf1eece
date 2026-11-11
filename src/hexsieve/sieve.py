@@ -70,7 +70,9 @@ class Sortable(Protocol):
 
 
 def sort_items[T: Sortable](items: Sequence[T], key: SortKey, seed: int | None = None) -> list[T]:
-    """Order items; `hex`/`-hex` compare the numeric value, so shorter strings sort lower."""
+    """Order items. `hex` / `-hex` compare numeric values, not text: `fa` (0xfa) sorts before
+    `ace` (0xace), although text order puts `ace` first. Equal values (`dd`, `0dd`) fall back
+    to length, then label. `-hex` is exactly the `hex` order reversed."""
     match key:
         case SortKey.TIER:
             return sorted(
@@ -79,7 +81,7 @@ def sort_items[T: Sortable](items: Sequence[T], key: SortKey, seed: int | None =
         case SortKey.HEX:
             return sorted(items, key=lambda x: (int(x.hex, 16), len(x.hex), x.label))
         case SortKey.HEX_DESC:
-            return sorted(items, key=lambda x: (int(x.hex, 16), len(x.hex), x.label), reverse=True)
+            return sort_items(items, SortKey.HEX)[::-1]
         case SortKey.ALPHA:
             return sorted(items, key=lambda x: (x.label, x.hex))
         case SortKey.RANDOM:

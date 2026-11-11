@@ -7,7 +7,7 @@ from hexsieve.rules import Derivation, Rule, RuleSet
 from hexsieve.sieve import Hit, SortKey, sieve, sort_items
 from hexsieve.tag import generate_tags
 
-CLASSIC = RuleSet((Rule("o0", "o", "0"), Rule("i1", "i", "1"), Rule("l1", "l", "1")))
+O0_I1_L1 = RuleSet((Rule("o0", "o", "0"), Rule("i1", "i", "1"), Rule("l1", "l", "1")))
 
 
 def entry(word: str, pos: Pos = Pos.NOUN, size: int | None = 35) -> Entry:
@@ -19,31 +19,43 @@ def hit(word: str, hex_: str, pos: Pos = Pos.NOUN, size: int | None = 35) -> Hit
 
 
 def test_sieve_keeps_only_spellable_entries() -> None:
-    hits = sieve([entry("coffee"), entry("tea"), entry("bad")], CLASSIC)
+    hits = sieve([entry("coffee"), entry("tea"), entry("bad")], O0_I1_L1)
     assert [(h.label, h.hex) for h in hits] == [("coffee", "c0ffee"), ("bad", "bad")]
 
 
+def test_sieve_emits_one_hit_per_spelling_of_one_word() -> None:
+    rules = RuleSet((Rule("g6", "g", "6"), Rule("g9", "g", "9")))
+    assert sorted(h.hex for h in sieve([entry("egg")], rules)) == ["e66", "e69", "e96", "e99"]
+
+
 def test_sieve_emits_one_hit_per_distinct_spelling_of_different_words() -> None:
-    hits = sieve([entry("bail"), entry("ball")], CLASSIC)
+    hits = sieve([entry("bail"), entry("ball")], O0_I1_L1)
     assert [(h.label, h.hex) for h in hits] == [("bail", "ba11"), ("ball", "ba11")]
 
 
 def test_sieve_filters_by_pos() -> None:
     hits = sieve(
-        [entry("dead", Pos.ADJ), entry("beef", Pos.NOUN)], CLASSIC, pos=frozenset({Pos.ADJ})
+        [entry("dead", Pos.ADJ), entry("beef", Pos.NOUN)], O0_I1_L1, pos=frozenset({Pos.ADJ})
     )
     assert [h.label for h in hits] == ["dead"]
 
 
 def test_max_size_drops_rarer_and_unsized_entries() -> None:
     entries = [entry("ace", size=35), entry("abed", size=70), entry("dace", size=None)]
-    assert [h.label for h in sieve(entries, CLASSIC, max_size=60)] == ["ace"]
+    assert [h.label for h in sieve(entries, O0_I1_L1, max_size=60)] == ["ace"]
 
 
 def test_hex_sort_compares_numeric_value_not_text() -> None:
-    items = [hit("deadbeef", "deadbeef"), hit("coffee", "c0ffee"), hit("ace", "ace")]
-    assert [h.hex for h in sort_items(items, SortKey.HEX)] == ["ace", "c0ffee", "deadbeef"]
-    assert [h.hex for h in sort_items(items, SortKey.HEX_DESC)] == ["deadbeef", "c0ffee", "ace"]
+    # Text order would put "ace" before "fa"; numerically 0xfa < 0xace.
+    items = [hit("ace", "ace"), hit("fa", "fa"), hit("odd", "0dd"), hit("dd", "dd")]
+    assert [h.hex for h in sort_items(items, SortKey.HEX)] == ["dd", "0dd", "fa", "ace"]
+
+
+def test_hex_desc_is_exactly_hex_reversed_including_full_ties() -> None:
+    # Same word in two parts of speech ties on (value, length, label).
+    items = [hit("ace", "ace", Pos.NOUN), hit("ace", "ace", Pos.VERB), hit("fa", "fa")]
+    asc = sort_items(items, SortKey.HEX)
+    assert sort_items(items, SortKey.HEX_DESC) == asc[::-1]
 
 
 def test_tier_sort_puts_unsized_last() -> None:

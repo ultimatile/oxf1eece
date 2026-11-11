@@ -3,7 +3,8 @@
 Run with `uv run scripts/build_lexicon.py`. Sources are downloaded into `.cache/sources/`
 (checked against pinned SHA-256 digests) unless already present.
 
-- OEWN 2025 (no proper nouns) supplies lemmas, parts of speech and glosses.
+- OEWN 2025 (the edition without the Namenet proper nouns) supplies lemmas, parts of
+  speech and glosses; only single-word lowercase lemmas are kept.
 - ESDB supplies each word's size and the inflected forms of OEWN lemmas. Only ESDB data of
   size 80 or less is used: larger sizes bring in UK Advanced Cryptics Dictionary words,
   whose licence would add a further notice requirement.
@@ -24,10 +25,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+from hexsieve.lexicon import Entry, Pos, format_rows
 
-from hexsieve.lexicon import Entry, Pos, format_rows  # noqa: E402
+ROOT = Path(__file__).resolve().parent.parent
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +56,11 @@ WORD = re.compile(r"[a-z]+")
 
 OEWN_POS = {"n": Pos.NOUN, "v": Pos.VERB, "a": Pos.ADJ, "s": Pos.ADJ, "r": Pos.ADV}
 # ESDB POS tag -> POS of the inflected forms listed on that line. `m` (noun/verb) lists
-# verb forms (-ed, -ing, -s); `a` (adjective/adverb) lists comparatives for both.
+# -ed / -ing verb forms and an -s form that may also be a noun plural; all are recorded
+# as verb forms only, so that no -ed / -ing form is ever tagged as a noun. `a`
+# (adjective/adverb) lists comparatives and superlatives, which serve both. Lines with any
+# other tag (including the combined `n_v` / `aj_av`, which the pinned data does not use)
+# contribute sizes but no inflected forms.
 ESDB_POS = {
     "n": (Pos.NOUN,),
     "v": (Pos.VERB,),
@@ -64,8 +68,6 @@ ESDB_POS = {
     "aj": (Pos.ADJ,),
     "av": (Pos.ADV,),
     "a": (Pos.ADJ, Pos.ADV),
-    "n_v": (Pos.NOUN, Pos.VERB),
-    "aj_av": (Pos.ADJ, Pos.ADV),
 }
 
 
@@ -93,7 +95,10 @@ class ReadableBytes(Protocol):
 
 
 def parse_oewn(xml: ReadableBytes) -> dict[tuple[str, Pos], list[str]]:
-    """Return {(lemma, pos): glosses} for single-word, lowercase ASCII lemmas in WN-LMF XML."""
+    """Return {(lemma, pos): glosses} for single-word, lowercase ASCII lemmas in WN-LMF XML.
+
+    Each list holds the first GLOSSES_PER_ENTRY distinct definitions, in sense order.
+    """
     senses: dict[tuple[str, Pos], list[str]] = defaultdict(list)
     definitions: dict[str, str] = {}
     for _, el in ET.iterparse(xml, events=("end",)):
@@ -118,13 +123,16 @@ def parse_oewn(xml: ReadableBytes) -> dict[tuple[str, Pos], list[str]]:
 
 # --- ESDB -------------------------------------------------------------------------------
 
-# LEMMA_INFO := [GROUP-ANNOTATION] WORD [ANNOTATION] [' <' POS ['/' CLASS] '>'] [{..}] [(..)]
+# LEMMA_INFO := ([GROUP-ANNOTATION] WORD [ANNOTATION] | '-') [' <' POS ['/' CLASS] '>']
+#               [' {' DEFN-NOTE '}'] [' (' USAGE-NOTE ')']
 LEMMA_INFO = re.compile(
     r"(?P<word>-|[-@!]?[^\s<{(]+?[*\-@~!†]?)(?: <(?P<pos>[a-z_]*)(?:/[^>]*)?>)?"
     r"(?: \{[^}]*\})?(?: \([^)]*\))?"
 )
-VARIANT_INFO = re.compile(r"\+|[ABZCD_][.=?v~V@x-]?(?: [ABZCD_][.=?v~V@x-]?)*(?: \{\d+\})?")
-DERIVED_TOKEN = re.compile(r"[^\s,|():]+")
+# VARIANT-INFO prefix. The OVERRIDE form `+` is not used by the pinned data and not handled.
+VARIANT_INFO = re.compile(r"[ABZCD_][.=?v~V@x-]?(?: [ABZCD_][.=?v~V@x-]?)*(?: \{\d+\})?")
+# ENTRY := DERIVED | '(' [DERIVED-VARIANT-INFO ' ' ... ': '] DERIVED '|' ... ')'
+DERIVED_ENTRY = re.compile(r"\s*\(([^)]*)\)|([^,]+)")
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,11 +148,40 @@ def _clean_word(token: str) -> str | None:
     return word if WORD.fullmatch(word) else None
 
 
+def _is_invalid(variant_info: str) -> bool:
+    """Whether a variant-info prefix marks a spelling with level `x` (ESDB: invalid)."""
+    return any(t.endswith("x") for t in variant_info.split())
+
+
+def _derived_words(derived: str) -> list[str]:
+    """The derived forms, annotation marks stripped, that are plain lowercase words.
+
+    Variant markers (`x: `, `v: ` before a bracketed alternative) are removed, and forms
+    marked invalid (level `x`) are dropped.
+    """
+    words: list[str] = []
+    for m in DERIVED_ENTRY.finditer(derived):
+        alternatives = m[1].split("|") if m[1] is not None else [m[2]]
+        for alt in alternatives:
+            info, sep, form = alt.strip().rpartition(": ")
+            if sep and _is_invalid(info):
+                continue
+            if (word := _clean_word(form.strip())) is not None:
+                words.append(word)
+    return words
+
+
 def parse_esdb(lines: Iterable[str]) -> Iterator[EsdbLine]:
     """Yield one EsdbLine per data line, resolving `-` (same lemma) continuation lines.
 
-    Lines whose lemma or derived forms are not plain lowercase words keep only the parts
-    that are; lines with no usable word are skipped.
+    Spelling-variant prefixes (`A Bv C: `, `_~: `) are skipped, and so is any line or
+    bracketed derived form whose spelling is marked invalid (variant level `x`); an invalid
+    lemma line leaves the group's lemma unchanged for the continuation lines after it. A
+    line whose lemma, once ESDB's annotation marks (`!`, `-`, `@`, `*`, `~`, `†`) are
+    stripped, is not a plain lowercase word (e.g. `Bob`) is skipped together with the
+    continuation lines that follow it. Derived forms are stripped the same way and dropped
+    unless plain lowercase words (possessives, hyphenated or capitalised forms go). Lines
+    without a `: ` separator, a size or a parsable lemma are skipped.
     """
     lemma: str | None = None
     for raw in lines:
@@ -159,21 +196,22 @@ def parse_esdb(lines: Iterable[str]) -> Iterator[EsdbLine]:
         if not sizes:
             continue
         head, _, derived = rest.partition(": ")
+        invalid = False
         while VARIANT_INFO.fullmatch(head):
+            invalid = invalid or _is_invalid(head)
             head, _, derived = derived.partition(": ")
         m = LEMMA_INFO.fullmatch(head)
-        if m is None:
+        if m is None or invalid:
             continue
-        if m["word"] == "-":
-            if lemma is None:
-                continue
-        else:
+        if m["word"] != "-":
             lemma = _clean_word(m["word"])
-            if lemma is None:
-                continue
-        words = (_clean_word(t) for t in DERIVED_TOKEN.findall(derived))
+        if lemma is None:
+            continue
         yield EsdbLine(
-            min(sizes), lemma, m["pos"] or "", tuple(w for w in words if w and w != lemma)
+            min(sizes),
+            lemma,
+            m["pos"] or "",
+            tuple(w for w in _derived_words(derived) if w != lemma),
         )
 
 
