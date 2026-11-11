@@ -255,7 +255,8 @@ def parse_esdb(lines: Iterable[str]) -> Iterator[EsdbLine]:
 
 def build_entries(oewn: dict[tuple[str, Pos], list[str]], esdb: Iterable[EsdbLine]) -> list[Entry]:
     sizes: dict[str, int] = {}
-    inflections: dict[tuple[str, Pos], str] = {}  # (form, pos) -> lemma
+    # (form, pos, lemma); a form shared by several lemmas (bases: base, basis) gets a row for each
+    inflections: dict[tuple[str, Pos, str], None] = {}
     for line in esdb:
         if line.size > ESDB_MAX_SIZE:
             continue
@@ -266,7 +267,7 @@ def build_entries(oewn: dict[tuple[str, Pos], list[str]], esdb: Iterable[EsdbLin
                 continue
             for form in line.derived:
                 if (form, pos) not in oewn:
-                    inflections.setdefault((form, pos), line.lemma)
+                    inflections[(form, pos, line.lemma)] = None
 
     def gloss(key: tuple[str, Pos]) -> str:
         return " | ".join(oewn[key]).replace("\t", " ")
@@ -274,9 +275,9 @@ def build_entries(oewn: dict[tuple[str, Pos], list[str]], esdb: Iterable[EsdbLin
     entries = [Entry(w, p, sizes.get(w), w, gloss((w, p))) for (w, p) in oewn]
     entries += [
         Entry(form, pos, sizes.get(form), lemma, gloss((lemma, pos)))
-        for (form, pos), lemma in inflections.items()
+        for (form, pos, lemma) in inflections
     ]
-    entries.sort(key=lambda e: (e.word, e.pos.value))
+    entries.sort(key=lambda e: (e.word, e.pos.value, e.lemma))
     return entries
 
 

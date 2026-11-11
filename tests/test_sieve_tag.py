@@ -109,3 +109,23 @@ def test_tags_ignore_other_parts_of_speech() -> None:
 def test_tags_need_two_digits() -> None:
     with pytest.raises(ValueError, match="at least 2"):
         generate_tags([], 1)
+
+
+def test_a_word_listed_under_two_lemmas_is_paired_once() -> None:
+    adj = hit("bad", "bad", Pos.ADJ)
+    bases_of_base = Hit(Entry("bases", Pos.NOUN, 35, "base", "g1"), Derivation("ba5e5", ()))
+    bases_of_basis = Hit(Entry("bases", Pos.NOUN, 35, "basis", "g2"), Derivation("ba5e5", ()))
+    tags = generate_tags([adj, bases_of_base, bases_of_basis], 8)
+    assert [t.label for t in tags] == ["bad+bases"]
+
+
+def test_tag_pairing_keeps_entries_that_differ_in_pos_word_or_hex() -> None:
+    # Same word and hex in two parts of speech: one serves as the adjective, one as the noun.
+    pair = [hit("fade", "fade", Pos.ADJ), hit("fade", "fade", Pos.NOUN)]
+    assert [t.label for t in generate_tags(pair, 8)] == ["fade+fade"]
+    adj = hit("bad", "bad", Pos.ADJ)
+    nouns = [hit("egg", "e66"), hit("egg", "e99"), hit("bail", "ba11"), hit("ball", "ba11")]
+    # Same word, two hex spellings: both are paired.
+    assert sorted(t.hex for t in generate_tags([adj, *nouns], 6)) == ["bade66", "bade99"]
+    # Same hex, two words: both are paired.
+    assert sorted(t.label for t in generate_tags([adj, *nouns], 7)) == ["bad+bail", "bad+ball"]

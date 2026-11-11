@@ -195,6 +195,14 @@ def test_lines_with_unmapped_pos_give_sizes_but_no_forms() -> None:
     }
 
 
+def test_a_form_shared_by_two_lemmas_gets_a_row_for_each() -> None:
+    oewn = {("base", Pos.NOUN): ["a support"], ("basis", Pos.NOUN): ["a foundation"]}
+    # basis comes first in the input; rows are still ordered by lemma
+    esdb = [EsdbLine(35, "basis", "n", ("bases",)), EsdbLine(35, "base", "n", ("bases",))]
+    rows = [(e.word, e.lemma, e.gloss) for e in build_entries(oewn, esdb) if e.inflected]
+    assert rows == [("bases", "base", "a support"), ("bases", "basis", "a foundation")]
+
+
 def test_esdb_data_above_size_80_is_ignored() -> None:
     oewn = {("abject", Pos.VERB): ["cast down"]}
     entries = build_entries(oewn, [EsdbLine(85, "abject", "m", ("abjected",))])

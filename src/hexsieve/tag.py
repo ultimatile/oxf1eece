@@ -34,7 +34,8 @@ def generate_tags(hits: Iterable[Hit], digits: int) -> list[Tag]:
     """Pair every adjective hit with every noun hit so the joined hex has `digits` digits.
 
     Lengths are those of the hex spellings, which differ from the word lengths when a
-    multi-letter rule (e.g. ate -> 8) fired.
+    multi-letter rule (e.g. ate -> 8) fired. A word listed more than once with the same part
+    of speech and spelling (an inflected form of two lemmas, e.g. bases) is paired once.
     """
     if digits < 2:
         raise ValueError(f"digits must be at least 2, got {digits}")
@@ -42,8 +43,11 @@ def generate_tags(hits: Iterable[Hit], digits: int) -> list[Tag]:
         Pos.ADJ: defaultdict(list),
         Pos.NOUN: defaultdict(list),
     }
+    seen: set[tuple[Pos, str, str]] = set()
     for h in hits:
-        if h.entry.pos in by_len:
+        key = (h.entry.pos, h.entry.word, h.hex)
+        if h.entry.pos in by_len and key not in seen:
+            seen.add(key)
             by_len[h.entry.pos][len(h.hex)].append(h)
     adjs, nouns = by_len[Pos.ADJ], by_len[Pos.NOUN]
     return [
