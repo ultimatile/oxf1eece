@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import sys
 from collections.abc import Callable, Iterator, Sequence
@@ -198,6 +199,10 @@ def _print_rules() -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    # Glosses contain non-ASCII text; write UTF-8 whatever the locale says.
+    stdout = sys.stdout
+    if isinstance(stdout, io.TextIOWrapper):
+        stdout.reconfigure(encoding="utf-8")
     args = build_parser().parse_args(argv)
     try:
         match args.command:

@@ -30,7 +30,9 @@ def fzf_select(rows: Iterable[str], *, preview_field: int) -> list[str]:
         f"--preview=printf '%s\\n' {{{preview_field}}}",
         "--preview-window=down,3,wrap",
     ]
-    proc = subprocess.run(cmd, input="".join(rows), stdout=subprocess.PIPE, text=True, check=False)
+    proc = subprocess.run(
+        cmd, input="".join(rows), stdout=subprocess.PIPE, encoding="utf-8", check=False
+    )
     # fzf exits 1 when nothing matched and 130 when the user aborted; both mean "no pick".
     if proc.returncode not in (0, 1, 130):
         raise subprocess.CalledProcessError(proc.returncode, cmd)

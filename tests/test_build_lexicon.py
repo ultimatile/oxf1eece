@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import io
 from pathlib import Path
 
+import build_lexicon
 import pytest
 from build_lexicon import (
     EsdbLine,
@@ -47,6 +49,12 @@ not a data line
 
 60 [12dicts]: Bob <v>: bobbed, bobbing
 60 [12dicts]: - <v>: bobs
+
+35 [12dicts]: big <aj>
+## a comment line inside a group
+35 [12dicts]: - <aj>: bigger, biggest
+70 [moby]: big top <n>
+70 [moby]: - <n>: bigtops
 """
 
 
@@ -257,3 +265,62 @@ def test_fetch_rejects_a_cached_file_with_the_wrong_digest(tmp_path: Path) -> No
     src = Source("https://example.invalid/data.txt", "0" * 64, "data.txt")
     with pytest.raises(SystemExit, match="does not match pinned"):
         fetch(src, tmp_path)
+
+
+def test_esdb_comment_line_does_not_end_a_group() -> None:
+    assert EsdbLine(35, "big", "aj", ("bigger", "biggest")) in esdb_lines()
+
+
+def test_esdb_unparsable_lemma_owns_its_continuation_lines() -> None:
+    assert "bigtops" not in esdb_words()
+
+
+class FakeResponse(io.BytesIO):
+    pass
+
+
+def test_fetch_does_not_cache_a_download_with_the_wrong_digest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def urlopen(_url: str) -> FakeResponse:
+        return FakeResponse(b"tampered")
+
+    monkeypatch.setattr(build_lexicon.urllib.request, "urlopen", urlopen)
+    src = Source("https://example.invalid/data.txt", "0" * 64, "data.txt")
+    with pytest.raises(SystemExit, match="does not match pinned"):
+        fetch(src, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_fetch_caches_a_download_with_the_pinned_digest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def urlopen(_url: str) -> FakeResponse:
+        return FakeResponse(b"good")
+
+    monkeypatch.setattr(build_lexicon.urllib.request, "urlopen", urlopen)
+    src = Source(
+        "https://example.invalid/data.txt", hashlib.sha256(b"good").hexdigest(), "data.txt"
+    )
+    assert fetch(src, tmp_path).read_bytes() == b"good"
+    assert [p.name for p in tmp_path.iterdir()] == ["data.txt"]
+
+
+def test_fetch_returns_a_cached_file_with_the_pinned_digest(tmp_path: Path) -> None:
+    (tmp_path / "data.txt").write_bytes(b"good")
+    src = Source(
+        "https://example.invalid/data.txt", hashlib.sha256(b"good").hexdigest(), "data.txt"
+    )
+    assert fetch(src, tmp_path) == tmp_path / "data.txt"
+
+
+def test_fetch_leaves_nothing_when_the_transfer_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def urlopen(_url: str) -> FakeResponse:
+        raise OSError("connection reset")
+
+    monkeypatch.setattr(build_lexicon.urllib.request, "urlopen", urlopen)
+    with pytest.raises(OSError, match="connection reset"):
+        fetch(Source("https://example.invalid/d", "0" * 64, "d"), tmp_path)
+    assert list(tmp_path.iterdir()) == []

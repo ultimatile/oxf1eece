@@ -68,7 +68,8 @@ def test_fewest_rules_is_global_not_chosen_per_suffix() -> None:
 
 
 @pytest.mark.parametrize(
-    ("source", "target"), [("", "0"), ("O", "0"), ("o1", "0"), ("o", "g"), ("o", "")]
+    ("source", "target"),
+    [("", "0"), ("O", "0"), ("o1", "0"), ("é", "0"), ("o", "g"), ("o", "")],
 )
 def test_invalid_rule_is_rejected(source: str, target: str) -> None:
     with pytest.raises(RuleError):

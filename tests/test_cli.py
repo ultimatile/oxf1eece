@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -186,3 +187,38 @@ def test_broken_lexicon_is_reported_as_an_error(
     monkeypatch.setattr(cli, "load_lexicon", broken)
     assert main(["list"]) == 2
     assert "hexsieve: error: line 2" in capsys.readouterr().err
+
+
+def test_output_is_utf8_even_under_an_ascii_locale() -> None:
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from hexsieve.cli import main; sys.exit(main(['list']))",
+        ],
+        capture_output=True,
+        env={**os.environ, "PYTHONIOENCODING": "ascii", "PYTHONUTF8": "0"},
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    text = proc.stdout.decode("utf-8")
+    assert not text.isascii()
+
+
+@needs_fzf
+def test_search_rows_reach_fzf_as_utf8_under_an_ascii_locale() -> None:
+    code = "import sys; from hexsieve.cli import main; sys.exit(main(['search', '--pos', 'adj']))"
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        env={
+            **os.environ,
+            "PYTHONIOENCODING": "ascii",
+            "PYTHONUTF8": "0",
+            "LC_ALL": "C",
+            "FZF_DEFAULT_OPTS": "--filter=ab1e",
+        },
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "ab1e\table\ta" in proc.stdout.decode("utf-8")

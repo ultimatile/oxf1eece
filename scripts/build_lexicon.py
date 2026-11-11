@@ -72,18 +72,33 @@ ESDB_POS = {
 
 
 def fetch(src: Source, cache_dir: Path) -> Path:
+    """Return the cached source file, downloading it first if absent.
+
+    A download is moved into the cache only after its digest matches, so a bad download
+    never stays cached; a cached file with the wrong digest must be deleted by hand.
+    """
     path = cache_dir / src.filename
-    if not path.exists():
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        print(f"downloading {src.url}", file=sys.stderr)
-        tmp = path.with_suffix(path.suffix + ".part")
+    if path.exists():
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != src.sha256:
+            raise SystemExit(
+                f"{path}: sha256 {digest} does not match pinned {src.sha256}; "
+                "delete it to download again"
+            )
+        return path
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    print(f"downloading {src.url}", file=sys.stderr)
+    tmp = path.with_suffix(path.suffix + ".part")
+    try:
         with urllib.request.urlopen(src.url) as resp, tmp.open("wb") as out:
             while chunk := resp.read(1 << 20):
                 out.write(chunk)
+        digest = hashlib.sha256(tmp.read_bytes()).hexdigest()
+        if digest != src.sha256:
+            raise SystemExit(f"{src.url}: sha256 {digest} does not match pinned {src.sha256}")
         tmp.rename(path)
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    if digest != src.sha256:
-        raise SystemExit(f"{path}: sha256 {digest} does not match pinned {src.sha256}")
+    finally:
+        tmp.unlink(missing_ok=True)  # a failed or mismatched download leaves nothing behind
     return path
 
 
@@ -177,18 +192,21 @@ def parse_esdb(lines: Iterable[str]) -> Iterator[EsdbLine]:
     Spelling-variant prefixes (`A Bv C: `, `_~: `) are skipped, and so is any line or
     bracketed derived form whose spelling is marked invalid (variant level `x`); an invalid
     lemma line leaves the group's lemma unchanged for the continuation lines after it. A
-    line whose lemma, once ESDB's annotation marks (`!`, `-`, `@`, `*`, `~`, `†`) are
-    stripped, is not a plain lowercase word (e.g. `Bob`) is skipped together with the
-    continuation lines that follow it. Derived forms are stripped the same way and dropped
-    unless plain lowercase words (possessives, hyphenated or capitalised forms go). Lines
-    without a `: ` separator, a size or a parsable lemma are skipped.
+    line whose lemma cannot be parsed (e.g. a multi-word lemma) or, once ESDB's annotation
+    marks (`!`, `-`, `@`, `*`, `~`, `†`) are stripped, is not a plain lowercase word (e.g.
+    `Bob`) is skipped together with the continuation lines that follow it. Derived forms
+    are stripped the same way and dropped unless plain lowercase words (possessives,
+    hyphenated or capitalised forms go). Lines without a `: ` separator or a size, and
+    comment-only lines, are skipped; only a blank line ends a group.
     """
     lemma: str | None = None
     for raw in lines:
-        line = raw.split("#", 1)[0].rstrip()
-        if not line:
+        if not raw.strip():
             lemma = None  # blank line ends the group
             continue
+        line = raw.split("#", 1)[0].rstrip()
+        if not line:
+            continue  # comment-only line
         info, sep, rest = line.partition(": ")
         if not sep:
             continue
@@ -200,8 +218,11 @@ def parse_esdb(lines: Iterable[str]) -> Iterator[EsdbLine]:
         while VARIANT_INFO.fullmatch(head):
             invalid = invalid or _is_invalid(head)
             head, _, derived = derived.partition(": ")
+        if invalid:
+            continue
         m = LEMMA_INFO.fullmatch(head)
-        if m is None or invalid:
+        if m is None:
+            lemma = None  # an unparsable lemma (e.g. multi-word) owns the lines after it
             continue
         if m["word"] != "-":
             lemma = _clean_word(m["word"])
