@@ -57,6 +57,10 @@ not a data line
 35 [12dicts]: A Bv: - <v> {insult}: gibed, gibing, gibes
 35 [12dicts]: Av B: - <v> {insult}: jibed, jibing, jibes
 
+50 [12dicts]: A: sulfur <n>
+50 [12dicts]: B: sulphur <n>
+50 [12dicts]: C: - <n>: sulfurs
+
 35 [12dicts]: big <aj>
 ## a comment line inside a group
 35 [12dicts]: - <aj>: bigger, biggest
@@ -283,6 +287,10 @@ def test_esdb_continuation_belongs_to_the_lemma_with_its_spelling_prefix() -> No
     lines = esdb_lines()
     assert EsdbLine(35, "gibe", "v", ("gibed", "gibing", "gibes")) in lines
     assert EsdbLine(35, "jibe", "v", ("jibed", "jibing", "jibes")) in lines
+
+
+def test_esdb_continuation_without_a_matching_prefix_belongs_to_the_latest_lemma() -> None:
+    assert EsdbLine(50, "sulphur", "n", ("sulfurs",)) in esdb_lines()
 
 
 def test_esdb_comment_line_does_not_end_a_group() -> None:
