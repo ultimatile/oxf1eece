@@ -203,20 +203,24 @@ def _derived_words(derived: str) -> list[str]:
 def parse_esdb(lines: Iterable[str]) -> Iterator[EsdbLine]:
     """Yield one EsdbLine per data line, resolving `-` (same lemma) continuation lines.
 
-    Spelling-variant prefixes (`A Bv C: `, `_~: `) are skipped, and so is any line or
-    bracketed derived form whose spelling is marked invalid (variant level `x`); an invalid
-    lemma line leaves the group's lemma unchanged for the continuation lines after it. A
+    A group may list several spellings, each line prefixed with its spelling variants
+    (`A Bv C: `, `_~: `); a continuation line belongs to the lemma line with the same prefix,
+    or to the most recent lemma line when none has it. Any line or bracketed derived form
+    whose spelling is marked invalid (variant level `x`) is skipped; an invalid lemma line
+    leaves the group's lemmas unchanged for the continuation lines after it. A
     line whose lemma cannot be parsed (e.g. a multi-word lemma) or, once ESDB's annotation
     marks (`!`, `-`, `@`, `*`, `~`, `†`) are stripped, is not a plain lowercase word (e.g.
-    `Bob`) is skipped together with the continuation lines that follow it. Derived forms
+    `Bob`) is skipped together with the later continuation lines that belong to it. Derived forms
     are stripped the same way and dropped unless plain lowercase words (possessives,
     hyphenated or capitalised forms go). Lines without a `: ` separator or a size, and
     comment-only lines, are skipped; only a blank line ends a group.
     """
-    lemma: str | None = None
+    lemma: str | None = None  # the group's most recent lemma line
+    by_prefix: dict[str, str | None] = {}  # spelling-variant prefix -> that line's lemma
     for raw in lines:
         if not raw.strip():
             lemma = None  # blank line ends the group
+            by_prefix.clear()
             continue
         line = raw.split("#", 1)[0].rstrip()
         if not line:
@@ -229,24 +233,31 @@ def parse_esdb(lines: Iterable[str]) -> Iterator[EsdbLine]:
             continue
         head, derived = _split_field(rest)
         invalid = False
+        prefixes: list[str] = []
         while VARIANT_INFO.fullmatch(head):
             invalid = invalid or _is_invalid(head)
+            prefixes.append(head)
             head, derived = _split_field(derived)
         if invalid:
             continue
+        prefix = ": ".join(prefixes)
         m = LEMMA_INFO.fullmatch(head)
         if m is None:
-            lemma = None  # an unparsable lemma (e.g. multi-word) owns the lines after it
+            # an unparsable lemma (e.g. multi-word) owns the later lines with its prefix
+            lemma = by_prefix[prefix] = None
             continue
         if m["word"] != "-":
-            lemma = _clean_word(m["word"])
-        if lemma is None:
+            lemma = by_prefix[prefix] = _clean_word(m["word"])
+            owner = lemma
+        else:
+            owner = by_prefix.get(prefix, lemma)
+        if owner is None:
             continue
         yield EsdbLine(
             min(sizes),
-            lemma,
+            owner,
             m["pos"] or "",
-            tuple(w for w in _derived_words(derived) if w != lemma),
+            tuple(w for w in _derived_words(derived) if w != owner),
         )
 
 

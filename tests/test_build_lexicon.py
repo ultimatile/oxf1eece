@@ -52,6 +52,11 @@ not a data line
 
 70 [3of6]: A B: -draught <n> {british: game of checkers}: draughts
 
+35 [12dicts]: A Bv: gibe <v> {insult}
+35 [12dicts]: Av B: jibe <v> {insult}
+35 [12dicts]: A Bv: - <v> {insult}: gibed, gibing, gibes
+35 [12dicts]: Av B: - <v> {insult}: jibed, jibing, jibes
+
 35 [12dicts]: big <aj>
 ## a comment line inside a group
 35 [12dicts]: - <aj>: bigger, biggest
@@ -75,7 +80,7 @@ def test_esdb_continuation_lines_inherit_the_group_lemma() -> None:
 
 
 def test_esdb_size_ignores_digits_inside_source_tags() -> None:
-    (line,) = [x for x in esdb_lines() if x.pos == "v" and not x.derived]
+    (line,) = [x for x in esdb_lines() if x.lemma == "aid" and x.pos == "v" and not x.derived]
     assert line.size == 35  # not 2 or 5 from the [5d+2a] tag
 
 
@@ -272,6 +277,12 @@ def test_lexicon_reader_rejects_malformed_rows(text: str, message: str) -> None:
 
 def test_esdb_sense_note_may_contain_the_field_separator() -> None:
     assert EsdbLine(70, "draught", "n", ("draughts",)) in esdb_lines()
+
+
+def test_esdb_continuation_belongs_to_the_lemma_with_its_spelling_prefix() -> None:
+    lines = esdb_lines()
+    assert EsdbLine(35, "gibe", "v", ("gibed", "gibing", "gibes")) in lines
+    assert EsdbLine(35, "jibe", "v", ("jibed", "jibing", "jibes")) in lines
 
 
 def test_esdb_comment_line_does_not_end_a_group() -> None:
