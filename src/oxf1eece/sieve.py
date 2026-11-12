@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
-from hexsieve.lexicon import Entry, Pos
-from hexsieve.rules import Derivation, RuleSet
+from oxf1eece.lexicon import Entry, Pos
+from oxf1eece.rules import Derivation, RuleSet
 
 
 @dataclass(frozen=True, slots=True)

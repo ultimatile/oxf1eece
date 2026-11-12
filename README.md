@@ -1,4 +1,4 @@
-# hexsieve
+# oxf1eece
 
 Find English words and adjective+noun tags that can be spelled in hexadecimal digits
 (hexspeak, such as `deadbeef` or `c0ffee`), with configurable letter-to-digit rules.
@@ -6,12 +6,12 @@ Find English words and adjective+noun tags that can be spelled in hexadecimal di
 ## Install
 
 ```sh
-uv tool install git+https://github.com/ultimatile/hexsieve
+uv tool install git+https://github.com/ultimatile/oxf1eece
 ```
 
-Upgrade with `uv tool upgrade hexsieve`, uninstall with `uv tool uninstall hexsieve`.
+Upgrade with `uv tool upgrade oxf1eece`, uninstall with `uv tool uninstall oxf1eece`.
 
-Requires Python 3.14 or later (uv installs it if missing). `hexsieve search` also needs
+Requires Python 3.14 or later (uv installs it if missing). `oxf1eece search` also needs
 [fzf](https://github.com/junegunn/fzf) on `PATH`.
 
 ## Usage
@@ -19,7 +19,7 @@ Requires Python 3.14 or later (uv installs it if missing). `hexsieve search` als
 Find 8-digit adjective+noun tags made of common words:
 
 ```console
-$ hexsieve tag 8 --max-size 35 --sort random --seed 7 --limit 5
+$ oxf1eece tag 8 --max-size 35 --sort random --seed 7 --limit 5
 1dea1dab	ideal+dab	35	i1,l1
 01df1ea5	old+fleas	35	l1,o0,s5
 fe11ace5	fell+aces	35	l1,s5
@@ -31,10 +31,10 @@ The columns are the hex spelling, the words, their size (see below) and the rule
 
 | Command | Prints |
 | --- | --- |
-| `hexsieve list` | words, as TSV: hex, word, part of speech, size, rules, definition |
-| `hexsieve tag DIGITS` | adjective+noun tags whose joined hex is exactly `DIGITS` long, as TSV: hex, adj+noun, size, rules |
-| `hexsieve search` | the `list` rows in fzf, with the definition in a preview pane; prints the rows you pick |
-| `hexsieve rules` | the available rules and presets |
+| `oxf1eece list` | words, as TSV: hex, word, part of speech, size, rules, definition |
+| `oxf1eece tag DIGITS` | adjective+noun tags whose joined hex is exactly `DIGITS` long, as TSV: hex, adj+noun, size, rules |
+| `oxf1eece search` | the `list` rows in fzf, with the definition in a preview pane; prints the rows you pick |
+| `oxf1eece rules` | the available rules and presets |
 
 ### Conversion rules
 
@@ -50,10 +50,10 @@ presets:
 Choose a preset with `--preset` and adjust it with comma-separated `--enable` / `--disable`:
 
 ```sh
-hexsieve list --preset classic --enable t7 --disable l1
+oxf1eece list --preset classic --enable t7 --disable l1
 ```
 
-`hexsieve rules` shows every rule, including multi-letter ones such as `ate8` (with `l1`, `late` → `18`).
+`oxf1eece rules` shows every rule, including multi-letter ones such as `ate8` (with `l1`, `late` → `18`).
 
 ### Filtering and sorting
 
@@ -80,5 +80,5 @@ spelling, such as `ball` and `bail` (`ba11`), are listed as separate rows.
 The bundled word list is derived from [Open English WordNet](https://github.com/globalwordnet/english-wordnet)
 (CC BY 4.0) and the [English Speller Database](https://github.com/en-wl/wordlist)
 (formerly SCOWL); attributions and licence texts are in
-[`src/hexsieve/data/licenses/`](src/hexsieve/data/licenses/). To regenerate it, run
+[`src/oxf1eece/data/licenses/`](src/oxf1eece/data/licenses/). To regenerate it, run
 `uv run scripts/build_lexicon.py`.

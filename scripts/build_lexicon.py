@@ -1,4 +1,4 @@
-"""Build src/hexsieve/data/lexicon.tsv.gz from pinned OEWN and ESDB sources.
+"""Build src/oxf1eece/data/lexicon.tsv.gz from pinned OEWN and ESDB sources.
 
 Run with `uv run scripts/build_lexicon.py`. Sources are downloaded into `.cache/sources/`
 (checked against pinned SHA-256 digests) unless already present.
@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from hexsieve.lexicon import Entry, Pos, format_rows
+from oxf1eece.lexicon import Entry, Pos, format_rows
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -304,7 +304,7 @@ def main() -> None:
     )
     ap.add_argument("--cache-dir", type=Path, default=ROOT / ".cache" / "sources")
     ap.add_argument(
-        "--out", type=Path, default=ROOT / "src" / "hexsieve" / "data" / "lexicon.tsv.gz"
+        "--out", type=Path, default=ROOT / "src" / "oxf1eece" / "data" / "lexicon.tsv.gz"
     )
     args = ap.parse_args()
 

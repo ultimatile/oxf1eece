@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from hexsieve.rules import (
+from oxf1eece.rules import (
     Derivation,
     Rule,
     RuleCatalog,

@@ -8,11 +8,11 @@ import os
 import sys
 from collections.abc import Callable, Iterator, Sequence
 
-from hexsieve.lexicon import LexiconError, Pos, load_lexicon
-from hexsieve.rules import DEFAULT_PRESET, RuleError, RuleSet, load_catalog
-from hexsieve.search import FzfNotFoundError, fzf_select
-from hexsieve.sieve import Hit, SortKey, sieve, sort_items
-from hexsieve.tag import Tag, generate_tags
+from oxf1eece.lexicon import LexiconError, Pos, load_lexicon
+from oxf1eece.rules import DEFAULT_PRESET, RuleError, RuleSet, load_catalog
+from oxf1eece.search import FzfNotFoundError, fzf_select
+from oxf1eece.sieve import Hit, SortKey, sieve, sort_items
+from oxf1eece.tag import Tag, generate_tags
 
 POS_CHOICES = {"noun": Pos.NOUN, "verb": Pos.VERB, "adj": Pos.ADJ, "adv": Pos.ADV}
 
@@ -90,7 +90,7 @@ def _common_parser() -> argparse.ArgumentParser:
 
 def build_parser() -> argparse.ArgumentParser:
     common = _common_parser()
-    parser = argparse.ArgumentParser(prog="hexsieve", description="Find hexspeak words and tags.")
+    parser = argparse.ArgumentParser(prog="oxf1eece", description="Find hexspeak words and tags.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     for name, help_ in (
@@ -227,7 +227,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Flush here so a closed pipe surfaces inside this try, not at interpreter exit.
         sys.stdout.flush()
     except (RuleError, LexiconError, FzfNotFoundError) as e:
-        print(f"hexsieve: error: {e}", file=sys.stderr)
+        print(f"oxf1eece: error: {e}", file=sys.stderr)
         return 2
     except BrokenPipeError:
         # Downstream (e.g. `| head`) closed the pipe. Point stdout at devnull so the

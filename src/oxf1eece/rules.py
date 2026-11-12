@@ -156,5 +156,5 @@ def parse_catalog(text: str) -> RuleCatalog:
 
 @cache
 def load_catalog() -> RuleCatalog:
-    text = files("hexsieve").joinpath("data", "rules.toml").read_text(encoding="utf-8")
+    text = files("oxf1eece").joinpath("data", "rules.toml").read_text(encoding="utf-8")
     return parse_catalog(text)

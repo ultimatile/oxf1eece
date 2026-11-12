@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from hexsieve.lexicon import Entry, Pos
-from hexsieve.rules import Derivation, Rule, RuleSet
-from hexsieve.sieve import Hit, SortKey, sieve, sort_items
-from hexsieve.tag import generate_tags
+from oxf1eece.lexicon import Entry, Pos
+from oxf1eece.rules import Derivation, Rule, RuleSet
+from oxf1eece.sieve import Hit, SortKey, sieve, sort_items
+from oxf1eece.tag import generate_tags
 
 O0_I1_L1 = RuleSet((Rule("o0", "o", "0"), Rule("i1", "i", "1"), Rule("l1", "l", "1")))
 
