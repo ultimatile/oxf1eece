@@ -1,4 +1,9 @@
-# oxf1eece
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo/ox_lockup_dark.svg">
+    <img src="logo/ox_lockup_light.svg" alt="oxf1eece" width="552">
+  </picture>
+</p>
 
 > `oxf1eece c0a75 d19175`
 
