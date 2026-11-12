@@ -5,7 +5,7 @@
   <img src="ox_lockup_light.svg" alt="oxf1eece" width="552">
 </picture>
 
-The name reads two ways, and the logo shows both.
+The name reads three ways, and the logo shows all of them.
 
 - **"ox fleece"**: an ox wearing a sheep's fleece. The fleece hides the body, but the
   brown head, the horns, the hooves and the tail give the ox away. oxf1eece does the
@@ -14,6 +14,8 @@ The name reads two ways, and the logo shows both.
   identical outlines, so `OXF1EECE` also reads as a hex literal. The `1` is the only
   character in the name that is a digit standing in for a letter (`l` → `1`), so it
   alone takes the ox's brown.
+- **`#F1EECE`**: read as a colour, the name is a cream close to undyed wool, so the
+  fleece is painted in it.
 
 <img src="ox_icon.svg" alt="oxf1eece icon" width="256">
 
@@ -47,7 +49,7 @@ sprite pixel) to keep every pixel square.
 | role                     | hex       |
 |--------------------------|-----------|
 | outline                  | `#2B2B2B` |
-| wool                     | `#F6F3EC` |
+| wool                     | `#F1EECE` |
 | wool curl                | `#D8D1C2` |
 | ox brown, accent (light) | `#9A5B34` |
 | accent (dark)            | `#C8875A` |
