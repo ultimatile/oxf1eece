@@ -1,2 +1,5 @@
-def main() -> None:
-    print("Hello from hexsieve!")
+from __future__ import annotations
+
+from hexsieve.cli import main
+
+__all__ = ["main"]
