@@ -1,5 +1,7 @@
 # oxf1eece
 
+> `oxf1eece c0a75 d19175`
+
 Find English words and adjective+noun tags that can be spelled in hexadecimal digits
 (hexspeak, such as `deadbeef` or `c0ffee`), with configurable letter-to-digit rules.
 
