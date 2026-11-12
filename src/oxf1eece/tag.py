@@ -6,8 +6,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from hexsieve.lexicon import Pos
-from hexsieve.sieve import Hit
+from oxf1eece.lexicon import Pos
+from oxf1eece.sieve import Hit
 
 
 @dataclass(frozen=True, slots=True)

@@ -16,7 +16,7 @@ from build_lexicon import (
     write_lexicon,
 )
 
-from hexsieve.lexicon import Entry, LexiconError, Pos, format_rows, parse_rows, read_lexicon
+from oxf1eece.lexicon import Entry, LexiconError, Pos, format_rows, parse_rows, read_lexicon
 
 ESDB_SAMPLE = """\
 not a data line

@@ -77,4 +77,4 @@ def read_lexicon(raw: bytes) -> tuple[Entry, ...]:
 
 @cache
 def load_lexicon() -> tuple[Entry, ...]:
-    return read_lexicon(files("hexsieve").joinpath("data", "lexicon.tsv.gz").read_bytes())
+    return read_lexicon(files("oxf1eece").joinpath("data", "lexicon.tsv.gz").read_bytes())

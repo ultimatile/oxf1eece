@@ -9,9 +9,9 @@ import sys
 
 import pytest
 
-from hexsieve import cli
-from hexsieve.cli import main
-from hexsieve.lexicon import Entry, LexiconError
+from oxf1eece import cli
+from oxf1eece.cli import main
+from oxf1eece.lexicon import Entry, LexiconError
 
 needs_fzf = pytest.mark.skipif(shutil.which("fzf") is None, reason="fzf not installed")
 
@@ -99,8 +99,8 @@ def test_bad_arguments_are_rejected_by_the_parser(argv: list[str]) -> None:
 
 
 def cli_command(*argv: str) -> list[str]:
-    """A command line that runs `hexsieve <argv>` in a fresh interpreter."""
-    code = f"import sys; from hexsieve.cli import main; sys.exit(main({list(argv)!r}))"
+    """A command line that runs `oxf1eece <argv>` in a fresh interpreter."""
+    code = f"import sys; from oxf1eece.cli import main; sys.exit(main({list(argv)!r}))"
     return [sys.executable, "-c", code]
 
 
@@ -187,7 +187,7 @@ def test_broken_lexicon_is_reported_as_an_error(
 
     monkeypatch.setattr(cli, "load_lexicon", broken)
     assert main(["list"]) == 2
-    assert "hexsieve: error: line 2" in capsys.readouterr().err
+    assert "oxf1eece: error: line 2" in capsys.readouterr().err
 
 
 def test_output_is_utf8_even_under_an_ascii_locale() -> None:

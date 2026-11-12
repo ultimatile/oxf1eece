@@ -1,5 +1,5 @@
 [project]
-name = "hexsieve"
+name = "oxf1eece"
 version = "0.1.0"
 description = "Find English words and adjective+noun tags spellable in hexadecimal (hexspeak)"
 readme = "README.md"
@@ -10,7 +10,7 @@ requires-python = ">=3.14"
 dependencies = []
 
 [project.scripts]
-hexsieve = "hexsieve:main"
+oxf1eece = "oxf1eece:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0", "ruff>=0.6", "pyright>=1.1.380"]

@@ -20,7 +20,7 @@ def fzf_select(rows: Iterable[str], *, preview_field: int) -> list[str]:
     fzf = shutil.which("fzf")
     if fzf is None:
         raise FzfNotFoundError(
-            "fzf not found on PATH; install it or use `hexsieve list | <filter>`"
+            "fzf not found on PATH; install it or use `oxf1eece list | <filter>`"
         )
     cmd = [
         fzf,
