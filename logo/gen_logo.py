@@ -11,9 +11,11 @@ its body, the way the tool dresses English words up in hexadecimal digits. The
 wordmark carries the second reading. It is set in Silkscreen, whose O has the same
 shape as its 0, so OXF1EECE also looks like the hex literal. The 1, the one letter
 in the name that is really a digit (an l in disguise), is set in the ox's brown.
+Read as a colour, #F1EECE is a cream close to undyed wool, so the fleece is
+painted in the name itself.
 
 The sprite is pixel data, not a drawing procedure. It was made by downsampling a
-vector draft onto a 32x24 grid and then retouching it pixel by pixel. To change it,
+vector draft onto the 32x23 grid and then retouching it pixel by pixel. To change it,
 edit SPRITE directly.
 
 Usage:
@@ -52,7 +54,7 @@ class Bounds(Protocol):
 # ── Palette ─────────────────────────────────────────────────
 PALETTE = {
     "K": "#2B2B2B",  # outline
-    "W": "#F6F3EC",  # wool
+    "W": "#F1EECE",  # wool: the name itself, read as a colour
     "w": "#D8D1C2",  # wool curl
     "B": "#9A5B34",  # ox brown
     "D": "#6E3D22",  # dark brown: far legs, tail tuft, horn outline
